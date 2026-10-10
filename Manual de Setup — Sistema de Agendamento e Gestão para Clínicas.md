@@ -1,6 +1,6 @@
 # Manual de Setup — Sistema de Agendamento e Gestão para Clínicas
 
-Oct 1, 2026 · @Raul
+Oct 10, 2026 · @Raul
 
 ## 1. Visão geral
 
@@ -10,7 +10,7 @@ Um setup completo para uma nova clínica leva de 2 a 4 horas de trabalho, mais a
 
 | Parte | Quem usa | Endereço | O que faz |
 | --- | --- | --- | --- |
-| Site de agendamento | Clientes | `/` | Agendamento em 5 etapas, sem login |
+| Site de agendamento | Clientes | `/` | Agendamento em 4 etapas, sem login, feito para o celular; vários serviços no mesmo atendimento |
 | Gerenciar agendamento | Cliente (link do e-mail) | `/agendamento/<código>` | Ver, remarcar, cancelar, adicionar à agenda |
 | Área do cliente | Cliente (link por e-mail, sem senha) | `/minha-conta` | Próximos atendimentos, histórico, pacotes, saldo de cashback |
 | Painel | Equipe da clínica | `/admin` | Agenda, clientes, serviços, equipe, marketing, financeiro, relatórios, configurações |
@@ -18,6 +18,8 @@ Um setup completo para uma nova clínica leva de 2 a 4 horas de trabalho, mais a
 **Como o sistema é feito:** React + Vite no navegador; um Cloudflare Worker (Hono) serve o site e a API; banco D1 (SQLite); arquivos no R2; tarefas automáticas a cada 15 minutos (lembretes, recorrências, validade do cashback); e-mails pelo Resend. Tudo roda no plano gratuito da Cloudflare para uma clínica pequena ou média.
 
 **Onde está o modelo:** o projeto-base é o repositório da Ello (`github.com/elloclinicdev/ello-clinic`, privado). Cada clínica nova recebe uma cópia própria, com contas próprias. Nunca publique duas clínicas no mesmo Worker ou banco.
+
+**Visual das páginas da cliente:** cartões e campos de cantos retos, fundo claro, etapas numeradas com nome (Serviço · Data e horário · Seus dados · Confirmação), logo pequena no topo com o botão “Meus agendamentos” e o título da aba “Agendamento on-line - <nome da clínica>”. A mesma cor principal vale para o site, o painel, os e-mails e o ícone da aba. Tudo vem das cores do arquivo de respostas (passo 1), sem editar código.
 
 **Duas regras que valem para o manual inteiro:**
 
@@ -51,17 +53,18 @@ Envie estas perguntas antes do setup; com as respostas em mãos, o setup não pa
 
 | # | Pergunta | Exemplo (Ello Clinic) |
 | --- | --- | --- |
-| 1 | Nome da clínica e slogan | Ello Clinic · “um elo entre você e seu bem estar” |
-| 2 | Logo (SVG ou PNG em alta) e cores (principal, fundo claro, texto escuro, em hex) | Símbolo de dois elos · `#EA7F64`, `#F1EEED`, `#3A2E2B` |
+| 1 | Nome da clínica e slogan (confira a grafia: hífen, acentos) | Ello Clinic · “um elo entre você e seu bem-estar” |
+| 2 | Logo (SVG ou PNG em alta) e cores (principal, fundo claro, texto escuro, em hex). Se a cliente mandar um print ou referência de layout, tire as cores dele | Símbolo de dois elos · `#C78069`, `#F6F3EE`, `#393432` |
 | 3 | Fontes (títulos e texto, do Google Fonts) ou “sugerir pelo logo” | Cormorant Garamond · Nunito Sans |
 | 4 | Telefone, WhatsApp (com 55), e-mail de contato, endereço, Instagram | (61) 99306-2431 · Planaltina-GO · @ello.clinic |
 | 5 | Domínio para os e-mails (e, se quiser, para o site) e quem administra o DNS | elloclinicgo.com.br (DNS na Cloudflare) |
-| 6 | Serviços: categoria, nome, duração, preço, intervalo de higienização, adicionais, se é em grupo | Limpeza de pele, 60 min, R$ 180, +15 min |
-| 7 | Profissionais: nome, cargo, e-mail, serviços que faz, jornada semanal com almoço, comissão % | Ana, seg–sex 9h–18h, almoço 12h–13h, 40% |
+| 6 | Serviços: categoria, nome, duração, preço, intervalo de higienização, adicionais, se é em grupo, **ordem em que aparecem no site** | Limpeza de pele, 60 min, R$ 180, +15 min |
+| 7 | Profissionais: nome, cargo, e-mail, serviços que faz, jornada semanal com almoço, comissão %. Se a clínica não quer que a cliente escolha profissional, cadastre uma só | Ana, seg–sex 9h–18h, almoço 12h–13h, 40% |
 | 8 | Pacotes de sessões (serviço, nº de sessões, preço, validade) | Drenagem, 10 sessões, R$ 1.300, 180 dias |
 | 9 | Confirmação dos agendamentos online: automática ou manual? | Automática |
 | 10 | Antecedência mínima, até quantos dias à frente, prazo para a cliente cancelar | 2 h · 60 dias · 24 h |
-| 11 | Perguntas extras do formulário | Alergias? Gestante? Como nos conheceu? |
+| 11 | Perguntas extras do formulário (quais são obrigatórias) | Alergias? Gestante? Como nos conheceu? |
+| 11b | Mostrar preços no site? (o valor total aparece sempre na etapa “Seus dados”) | Não |
 | 12 | Contas financeiras e saldo inicial; formas de pagamento e taxas | Banco, Caixa, Maquininha · PIX 0%, débito 1,49%, crédito 3,49% |
 | 13 | Categorias de despesa | Aluguel, salários, insumos, marketing, impostos… |
 | 14 | Anúncios: Pixel ID e token da API de Conversões; Google Ads ID e rótulo | Pixel 420378614399742 |
@@ -87,15 +90,17 @@ O comando `npm run setup` troca nome, cores, fontes, contatos e regras sem edita
    cp setup.answers.example.json setup.answers.json
    ```
 
-   Campos: `name`, `tagline`, `domain`, `phone`, `whatsapp`, `email`, `mailFrom`, `address`, `instagram`, `timezone`, `primary`, `surface`, `text`, `headingFont`, `bodyFont`, `minNoticeHours`, `maxAdvanceDays`, `cancelWindowHours`, `autoApprove`. O `mailFrom` precisa usar o domínio que será verificado no Resend (ex.: `agenda@elloclinicgo.com.br`).
+   Campos: `name`, `tagline`, `domain`, `phone`, `whatsapp`, `email`, `mailFrom`, `address`, `instagram`, `timezone`, `primary`, `primaryDark` e `primarySoft` (opcionais: se ficarem de fora, o setup calcula a partir da principal), `surface`, `text`, `muted`, `headingFont`, `bodyFont`, `slotStepMinutes`, `minNoticeHours`, `maxAdvanceDays`, `cancelWindowHours`, `reminderHoursBefore`, `autoApprove`, `allowAnyStaff`. O `mailFrom` precisa usar o domínio que será verificado no Resend (ex.: `agenda@elloclinicgo.com.br`).
 4. Rode o setup:
 
    ```bash
    npm run setup -- --answers setup.answers.json
    ```
 
-   Ele gera `clinic.config.ts`, o tema (`web/src/theme/_tokens.scss`), o favicon e troca no `wrangler.jsonc` o nome do Worker, do banco e do bucket.
-5. Troque a logo: o símbolo fica em `web/src/components/Logo.tsx` (SVG desenhado em código) e o favicon em `scripts/gen-theme.mjs`. Se o cliente mandar só PNG, peça o vetor ou vetorize antes.
+   Ele gera `clinic.config.ts`, o tema (`web/src/theme/_tokens.scss`), o favicon (`web/public/favicon.svg`), o coração dos e-mails na cor da marca (`web/public/email/heart.png`), troca o título da aba no `index.html` para “Agendamento on-line - <nome>” e troca no `wrangler.jsonc` o nome do Worker, do banco e do bucket.
+
+   O tema, o favicon e o coração são gerados de novo a cada `npm run dev` e `npm run deploy`, a partir do `clinic.config.ts`. Para mudar uma cor depois, mude só ali (ou rode o setup de novo) e publique.
+5. Troque a logo: o símbolo fica em `web/src/components/Logo.tsx` (SVG desenhado em código; ele também é usado como decoração no canto das páginas da cliente) e o favicon em `scripts/gen-theme.mjs`. Se o cliente mandar só PNG, peça o vetor ou vetorize antes.
 6. Confira se o setup **não** apagou os dados da Ello no `wrangler.jsonc`: `account_id`, `database_id` e `APP_URL` ainda são os da Ello e precisam ser trocados no passo 3. Publicar sem trocar enviaria o sistema para a conta da Ello.
 
 O arquivo `setup.answers.json` fica fora do GitHub (está no `.gitignore`).
@@ -108,9 +113,9 @@ Serviços, equipe e financeiro iniciais ficam em `seed/clinic-data.json`; o scri
 | --- | --- | --- |
 | `location` | Nome e endereço da unidade | — |
 | `serviceCategories` | `key`, `name`, `description` | `key` sem espaço, usado pelos serviços |
-| `services` | `key`, `category`, `name`, `description`, `duration` (min), `price` (R$), `bufferAfter`, `color`, `extras`, `capacity` | Preço em reais (180), não em centavos; `capacity` > 1 = serviço em grupo |
+| `services` | `key`, `category`, `name`, `description`, `duration` (min), `price` (R$), `bufferAfter`, `color`, `extras`, `capacity` | Preço em reais (180), não em centavos; `capacity` > 1 = serviço em grupo. A ordem do arquivo é a ordem inicial no site |
 | `packages` | `service` (key), `name`, `sessions`, `price`, `validityDays` | — |
-| `staff` | `key`, `name`, `role`, `email`, `color`, `commission` (%), `services` (keys), `schedule`, `breaks` | Dias: 0 = domingo … 6 = sábado; `"1-5": [["09:00","18:00"]]` |
+| `staff` | `key`, `name`, `role`, `email`, `color`, `commission` (%), `services` (keys), `schedule`, `breaks` | Dias: 0 = domingo … 6 = sábado; `"1-5": [["09:00","18:00"]]`. **Todo serviço precisa de pelo menos uma profissional**, senão não aparece horário |
 | `holidays` | `["MM-DD", "Nome"]` | Repetem todo ano; inclua feriados municipais |
 | `customFields` | `label`, `type`, `options`, `required` | Tipos: text, textarea, select, radio, checkbox, date |
 | `coupons` | `code`, `type` (percent/fixed), `value`, `oncePerCustomer` | — |
@@ -127,9 +132,11 @@ npx wrangler d1 execute DB --local --file=seed/seed.sql
 npm run dev   # abre em http://localhost:5173 e o painel em /admin
 ```
 
-O `--demo` apaga e recria o banco **local** com clientes e agendamentos fictícios, úteis para ver o layout cheio. Em produção ele nunca deve ser usado (passo 3). No local, os e-mails ficam só registrados (modo `log`) e aparecem em Configurações → Notificações.
+O `--demo` apaga e recria o banco **local** com clientes e agendamentos fictícios, úteis para ver o layout cheio. Em produção ele nunca deve ser usado (passo 3). No local, os e-mails ficam só registrados (modo `log`) e aparecem em Configurações → Notificações. Para isso, o `.dev.vars` (copie de `.dev.vars.example`) precisa ter `APP_URL=http://localhost:5173` e `EMAIL_PROVIDER=log`.
 
-Rode também `npm test` (21 testes) e `npm run typecheck`; os dois precisam passar sem erro.
+No teste local, use o modo celular do navegador (390 px de largura) e faça um agendamento com **um** serviço e outro com **dois**; tente avançar sem preencher nada para ver as mensagens de erro em vermelho.
+
+Rode também `npm test` (27 testes, incluindo os de vários serviços em sequência) e `npm run typecheck`; os dois precisam passar sem erro.
 
 ## 6. Passo 3 — Cloudflare: banco, arquivos e publicação
 
@@ -154,7 +161,7 @@ Todo comando deste passo age na conta em que o Wrangler estiver logado; por isso
    Não existe região na América do Sul; `enam` (leste dos EUA) é a mais próxima. Copie o `database_id` exibido para o `wrangler.jsonc`.
 5. **Crie o bucket de arquivos:** `npx wrangler r2 bucket create nova-clinica-files` (o nome precisa bater com `bucket_name` no `wrangler.jsonc`).
 6. **Defina o endereço público:** em *Workers & Pages*, veja o subdomínio `workers.dev` da conta. Em `wrangler.jsonc → vars`, coloque `APP_URL` = `https://<nome-do-worker>.<subdominio>.workers.dev` e deixe `EMAIL_PROVIDER` = `resend`. Os links dos e-mails usam o `APP_URL`.
-7. **Estrutura do banco de produção:** `npm run db:migrate:remote` (aplica 0001, 0002 e 0003).
+7. **Estrutura do banco de produção:** `npm run db:migrate:remote` (aplica de 0001 a 0005: estrutura, marketing e cashback, avisos para clínica e profissional, vários serviços por atendimento e a opção “Receber agendamento por e-mail”).
 8. **Dados iniciais de produção (só uma vez):**
 
    ```bash
@@ -165,7 +172,7 @@ Todo comando deste passo age na conta em que o Wrangler estiver logado; por isso
    Sem `--demo`, sem `--reset` e sem `ADMIN_EMAIL`: produção começa sem clientes fictícios e sem usuário. Num banco que já tem dados, esse comando falha de propósito em vez de apagar.
 9. **Publique:** `npm run deploy`. Nos primeiros 1–2 minutos algumas rotas podem responder `error code: 1042`; é a propagação, e passa sozinho.
 10. **Crie o administrador imediatamente:** abra `/admin`. Enquanto não existir usuário, a primeira pessoa que abrir essa página cria o admin.
-11. **Domínio próprio (opcional, recomendado):** com o domínio na mesma conta Cloudflare, vá em *Worker → Settings → Domains & Routes → Add Custom Domain* (ex.: `agenda.clinica.com.br`). Depois troque o `APP_URL`, publique de novo e adicione o domínio nas permissões de tráfego do Pixel (passo 7).
+11. **Domínio próprio (opcional, recomendado):** com o domínio na mesma conta Cloudflare, vá em *Worker → Settings → Domains & Routes → Add Custom Domain* (ex.: `agenda.clinica.com.br`). Depois troque o `APP_URL`, publique de novo e adicione o domínio nas permissões de tráfego do Pixel (passo 7). O `APP_URL` também é o endereço do coração que aparece nos e-mails (`/email/heart.png`); confira se ele abre no navegador.
 
 ## 7. Passo 4 — GitHub
 
@@ -209,6 +216,10 @@ Sem a chave do Resend, o sistema só registra os e-mails no painel e não envia 
 
 **Quem recebe o quê:**
 
+A cliente só recebe os e-mails do agendamento se deixar marcada a caixa **“Receber agendamento por e-mail”** na etapa “Seus dados” (vem marcada). Se desmarcar, ela não recebe confirmação, remarcação, cancelamento nem lembrete; a clínica e a profissional continuam sendo avisadas, e o link de acesso à área do cliente continua chegando quando ela mesma pede. Isso fica gravado na ficha da cliente e pode ser mudado pela recepção (*Clientes → editar → Recebe o agendamento por e-mail*).
+
+Num atendimento com vários serviços, sai **um e-mail só** para a cliente e para a clínica, com os serviços unidos por “+”, a duração total e o valor somado. Cada profissional envolvida recebe o aviso dela.
+
 | Movimentação | Cliente | Profissional | Clínica |
 | --- | --- | --- | --- |
 | Agendou pelo site | Confirmação (ou “pedido recebido”, se a aprovação for manual) | Novo agendamento | Novo agendamento online |
@@ -219,18 +230,21 @@ Sem a chave do Resend, o sistema só registra os e-mails no painel e não envia 
 
 O e-mail da profissional é o do cadastro dela na Equipe. O da clínica é o de *Configurações → Notificações → Avisos para a clínica* (vazio = e-mail de contato da clínica; aceita vários separados por vírgula).
 
+**Visual e variáveis dos e-mails:** cabeçalho e botões na cor principal, cantos retos. Nos modelos (*Configurações → Notificações*), além das variáveis de sempre, existem `{cashback_line}` (saldo e regra do cashback) e `{heart}` (coração na cor da marca). **Nunca cole ♥ ou 💛 nos modelos:** Gmail e iPhone trocam o caractere por um emoji próprio, vermelho ou amarelo. O `{heart}` é uma imagem gerada na cor principal e não muda.
+
 ## 9. Passo 6 — Primeiro acesso e ajustes no painel
 
 Depois de publicado, quase tudo se ajusta pelo painel em `/admin`, sem mexer em código. Faça nesta ordem:
 
 1. **Administrador:** abra `/admin` e preencha nome, e-mail e senha forte (mínimo 8 caracteres). Essa tela só aparece enquanto não existe nenhum usuário.
 2. **Configurações → Geral:** nome, telefone, WhatsApp (só números, com 55), e-mail, endereço e Instagram. Esses dados aparecem no rodapé do site, nos botões de WhatsApp, nos e-mails e no arquivo de agenda.
-3. **Configurações → Agendamento:** confirmação automática ou manual, intervalo entre horários, antecedência mínima e máxima, prazo de cancelamento, hora do lembrete, opções do site (sem preferência de profissional, repetição, lista de espera, cupom, mostrar preços, e-mail e nascimento obrigatórios) e os textos do site e da LGPD. O link de agendamento está nessa tela, com botão de copiar.
-4. **Serviços e Equipe:** confira cada serviço (preço, duração, intervalo, profissionais que fazem) e cada profissional (jornada, almoço, serviços, comissão, **e-mail real**). Cadastre folgas, férias e feriados locais.
-5. **Configurações → Formulário:** perguntas extras do agendamento.
-6. **Configurações → Notificações:** e-mail que recebe os avisos da clínica; revise os modelos de e-mail e use o botão de teste em cada um.
-7. **Configurações → Usuários:** crie os logins da equipe e vincule cada profissional ao seu cadastro.
-8. **Financeiro:** confira contas, saldos iniciais, formas de pagamento e taxas, categorias.
+3. **Configurações → Agendamento:** confirmação automática ou manual, intervalo entre horários, antecedência mínima e máxima, prazo de cancelamento, hora do lembrete, opções do site (sem preferência de profissional, lista de espera, cupom, mostrar preços, e-mail e nascimento obrigatórios), a mensagem depois de agendar e o texto da LGPD. O link de agendamento está nessa tela, com botão de copiar. A cliente não repete horários pelo site; a repetição (semanal, quinzenal, mensal) fica só no painel.
+4. **Serviços e Equipe:** confira cada serviço (preço, duração, intervalo, **antecedência máxima vazia ou maior que zero**, profissionais que fazem) e cada profissional (jornada, almoço, serviços, comissão, **e-mail real**). Cadastre folgas, férias e feriados locais. Serviço sem profissional vinculada aparece na lista, mas nunca tem horário; categoria sem serviços não aparece no site.
+5. **Serviços → Ordenar no site:** defina a ordem das categorias e dos serviços na lista do site (setas ou arrastar). Comece pelos mais procurados.
+6. **Configurações → Formulário:** perguntas extras do agendamento.
+7. **Configurações → Notificações:** e-mail que recebe os avisos da clínica; revise os modelos de e-mail e use o botão de teste em cada um.
+8. **Configurações → Usuários:** crie os logins da equipe e vincule cada profissional ao seu cadastro.
+9. **Financeiro:** confira contas, saldos iniciais, formas de pagamento e taxas, categorias.
 
 | Perfil de usuário | Pode |
 | --- | --- |
@@ -294,8 +308,13 @@ Marque cada item em produção, no endereço final, antes de passar o sistema ao
 - [ ] Logo, cores e fontes estão certas no site, no painel e no e-mail
 - [ ] Serviços, preços, durações e profissionais conferidos; e-mails reais nas profissionais
 - [ ] Jornadas, almoços, folgas e feriados locais cadastrados; os horários do site batem com a realidade
-- [ ] Agendamento de teste pelo celular (tela de 390 px) chega até “Tudo certo!”
-- [ ] Os 3 e-mails do agendamento aparecem como **enviado** e chegaram na caixa de entrada (não no spam)
+- [ ] Título da aba: “Agendamento on-line - <nome da clínica>”; favicon aparece
+- [ ] Agendamento de teste pelo celular (tela de 390 px) chega até “Tudo certo!”, com um serviço e com dois
+- [ ] Tentar avançar sem preencher mostra as mensagens em vermelho em cada etapa
+- [ ] A etapa “Seus dados” mostra o valor total correto
+- [ ] Ordem dos serviços no site definida pela clínica; nenhum serviço sem profissional
+- [ ] Os 3 e-mails do agendamento aparecem como **enviado** e chegaram na caixa de entrada (não no spam); o coração está na cor da marca
+- [ ] Agendamento com “Receber agendamento por e-mail” desmarcado não envia e-mail à cliente
 - [ ] Remarcar e cancelar pelo link do e-mail funcionam; dentro do prazo mínimo o sistema recusa
 - [ ] No painel: concluir e receber gera receita, taxa do cartão e comissão; o saldo da conta muda
 - [ ] DRE e fluxo de caixa mostram o lançamento
@@ -312,16 +331,20 @@ Use esta seção para conferir que nada ficou de fora e para responder dúvidas 
 
 | Função | Detalhe |
 | --- | --- |
-| Agendamento em 5 etapas | Procedimento → profissional → data e hora → dados → confirmação |
-| Filtro por categoria | Pílulas no topo da lista de serviços |
+| Agendamento em 4 etapas | **Serviço** (categoria, procedimento e, se houver mais de uma, profissional) → **Data e horário** → **Seus dados** → **Confirmação**; etapas numeradas com nome no topo |
+| Categoria e profissional | Categoria sempre visível; o campo Profissional só aparece quando o procedimento tem mais de uma (com uma só, ela é escolhida sozinha) |
+| Vários serviços no mesmo atendimento | Botão “Adicionar outro serviço” (até 6); os serviços são feitos em sequência, um logo após o outro, de preferência com a mesma profissional; só aparecem horários em que a sequência inteira cabe |
+| Ordem dos serviços | Definida pela clínica em *Serviços → Ordenar no site* |
+| Preços | Escondidos na lista (só a duração aparece), a menos que “Mostrar preços no site” esteja ligado; o **valor total** aparece sempre na etapa “Seus dados” (“a partir de” quando o preço varia entre as profissionais possíveis) |
 | Adicionais e grupo | Extras somam tempo e valor; serviços em grupo aceitam várias pessoas no mesmo horário |
 | Sem preferência de profissional | Mostra todos os horários; escolhe a profissional com menos agendamentos no dia |
-| Calendário inteligente | Só destaca dias com vaga; pula para o primeiro mês com horário; horários por manhã/tarde/noite |
-| Repetir horário | Semanal, quinzenal ou mensal, até 24 vezes; datas sem vaga são puladas e avisadas |
+| Calendário e roleta | Só destaca dias com vaga; pula para o primeiro mês com horário; horários numa lista com rolagem (“mais horários ↓”) ao lado do calendário |
+| Botões e erros | Voltar/Continuar sempre visíveis na base da tela; ao tentar avançar sem preencher, cada campo que falta fica com borda vermelha e mensagem (“Selecione o procedimento.”, “Escolha um horário…”, “Informe seu WhatsApp com DDD.”, “Informe um e-mail válido.”, “Campo obrigatório.”, “Autorize o uso dos dados…”) e a página rola até o primeiro erro |
 | Lista de espera | Quando não há horário bom |
-| Formulário | Nome, WhatsApp, e-mail, nascimento (opcional), perguntas extras por serviço, cupom, aceite LGPD |
-| Confirmação | Resumo, “adicionar à agenda” (.ics), link para gerenciar |
-| Gerenciar pelo link | Remarcar e cancelar até o prazo; depois disso mostra o WhatsApp |
+| Formulário | Nome, WhatsApp, e-mail, nascimento (opcional), perguntas extras por serviço, observações, valor total, cupom (se ligado e com preços visíveis), aceite LGPD e “Receber agendamento por e-mail” |
+| Confirmação | “Tudo certo!” + mensagem configurável; resumo Procedimento · Profissional · Data · Duração (com vários serviços: nomes unidos por “+” e duração total); quadro do programa de fidelidade; “Adicionar à agenda” (.ics) e “Gerenciar agendamento” |
+| Gerenciar pelo link | Remarcar e cancelar até o prazo; depois disso mostra o WhatsApp. Com vários serviços, cancelar cancela o atendimento inteiro e remarcar fica com a recepção |
+| Ajuda | Link “Dúvidas? Fale com a gente no WhatsApp” em todas as etapas |
 | Área do cliente | Acesso por link no e-mail (sem senha, vale 30 min): próximos, histórico, pacotes, cashback |
 | Aviso de cookies | Pixel e tag só carregam com aceite |
 
@@ -330,11 +353,11 @@ Use esta seção para conferir que nada ficou de fora e para responder dúvidas 
 | Área | Funções |
 | --- | --- |
 | Dashboard | Agendamentos hoje e 7 dias, faturamento e ticket médio, resultado do mês, gráfico de receitas × despesas (12 meses), faltas, serviços mais agendados, próximos atendimentos, card de cashback |
-| Agenda | Dia, semana, mês e lista; cores por profissional; arrastar para remarcar; clicar no vazio para agendar; mostrar cancelados |
-| Agendamento (janela) | Detalhes e respostas, observação interna, WhatsApp, remarcar, encaixe, confirmar, recusar, concluir e receber, falta, cancelar, reenviar e-mail |
+| Agenda | Dia, semana, mês e lista; cores por profissional; arrastar para remarcar; clicar no vazio para agendar; mostrar cancelados; repetir agendamento (semanal, quinzenal, mensal) |
+| Agendamento (janela) | Detalhes e respostas, observação interna, WhatsApp, remarcar, encaixe, confirmar, recusar, concluir e receber (com uso de cashback), falta, cancelar, reenviar e-mail; mostra “Atendimento com N serviços” quando faz parte de um grupo |
 | Agendamentos | Filtros, ações em lote, exportação CSV |
-| Clientes | Busca, CSV, ficha com histórico, pacotes, financeiro, cashback, vender pacote |
-| Serviços | Categorias, preço e duração por profissional, adicionais, intervalos, capacidade, antecedências, pacotes |
+| Clientes | Busca, CSV, ficha com histórico, pacotes, financeiro, cashback, vender pacote; se recebe os e-mails do agendamento e se aceita novidades |
+| Serviços | Categorias, preço e duração por profissional, adicionais, intervalos, capacidade, antecedências, pacotes, ordem no site |
 | Equipe | Jornada com vários períodos e intervalos por dia, folgas e férias, feriados, comissão, foto |
 | Marketing | Anúncios e conversões, cashback, cupons, lista de espera |
 | Financeiro | Visão geral, receitas, despesas (a pagar e a receber, recorrência, anexo), transferências, comissões (pagamento em lote), contas, fornecedores, categorias, formas de pagamento com taxa, conciliação |
@@ -344,7 +367,8 @@ Use esta seção para conferir que nada ficou de fora e para responder dúvidas 
 **Regras que o sistema aplica sozinho**
 
 - Um horário só aparece se cabe inteiro na jornada, não cruza almoço, respeita os intervalos antes e depois de outros atendimentos, não é feriado nem folga, e está entre a antecedência mínima e a máxima.
-- Duas pessoas nunca conseguem o mesmo horário: o servidor confere de novo no momento de gravar.
+- Duas pessoas nunca conseguem o mesmo horário: o servidor confere de novo no momento de gravar. Num atendimento com vários serviços, se um deles falhar, nenhum é gravado.
+- Vários serviços: o seguinte começa quando o anterior termina; com a mesma profissional, soma o maior intervalo de higienização entre os dois. Cupom vale só para atendimentos de um serviço.
 - Concluir e receber gera a receita, a despesa da taxa da maquininha e a comissão da profissional; atendimento por pacote consome uma sessão sem gerar receita nova.
 - Tarefas automáticas a cada 15 minutos: lembretes, despesas e receitas recorrentes, validade do cashback, limpeza de sessões.
 - Senhas criptografadas; tokens de anúncios e do Resend nunca aparecem no painel nem no site.
@@ -371,6 +395,13 @@ Todos os itens abaixo aconteceram no setup da Ello. A maioria vem de conta errad
 | Resend recusa o envio | Remetente de outro domínio (`elloclinic.com.br` em vez do verificado `elloclinicgo.com.br`) | Ajustar `mail.from` no `clinic.config.ts` e publicar |
 | `secret put` termina em `fetch failed` | Falha momentânea de rede ou VPN | Repetir; desligar VPN; usar o Terminal do Mac |
 | Cliente não consegue cancelar | Está dentro do prazo mínimo (padrão 24 h) | Comportamento esperado; a recepção cancela pelo painel |
+| Site só mostra horários de hoje | Serviço salvo com “agendar com até 0 dias” | Deixar o campo vazio (usa o padrão da clínica) ou pôr os dias; já corrigido no formulário |
+| Serviço aparece, mas nunca tem horário | Nenhuma profissional vinculada ao serviço | *Serviços → editar → profissionais* |
+| Categoria não aparece no site | Categoria sem serviço ativo | Mover os serviços para ela ou apagar a categoria |
+| Celular mostra o layout antigo depois de publicar | Página antiga guardada no navegador | Fechar a aba e abrir de novo, ou puxar a página para recarregar |
+| Coração dos e-mails vermelho ou amarelo | ♥ ou 💛 colado no modelo vira emoji | Usar `{heart}` no modelo |
+| Ícone da aba ou coração do e-mail não abre (devolve a página do site) | Pasta `web/public` fora da publicação | `publicDir: 'web/public'` no `vite.config.ts` (já está no modelo) |
+| Calendário estoura a tela no celular | Grade sem limite de largura | Já corrigido no modelo; se mexer no CSS, teste em 390 px |
 
 ## 15. Manutenção e comandos úteis
 
@@ -391,5 +422,6 @@ Toda alteração segue a mesma sequência: testar no local, publicar e salvar no
 
 - **Backup:** o D1 guarda um histórico de 30 dias (*Time Travel*), mas faça um export mensal e guarde fora da Cloudflare.
 - **Trocar chaves:** gere a chave nova na plataforma (Resend, Meta), salve no sistema e só depois apague a antiga, para os envios não pararem.
-- **Melhorias no modelo:** faça a melhoria no repositório-modelo e leve para cada clínica com `git pull` de um remoto `modelo`, testando antes de publicar. Migrations novas sempre ganham um número novo (`0004_…sql`); nunca edite uma que já foi aplicada.
+- **Melhorias no modelo:** faça a melhoria no repositório-modelo e leve para cada clínica com `git pull` de um remoto `modelo`, testando antes de publicar. Migrations novas sempre ganham um número novo (a próxima é `0006_…sql`); nunca edite uma que já foi aplicada. Depois de puxar uma melhoria com migration nova, rode `npm run db:migrate:remote` **antes** do `npm run deploy`.
+- **Mudar cores depois:** altere `colors` no `clinic.config.ts` e publique; site, painel, e-mails novos, favicon e coração mudam juntos. Os modelos de e-mail já salvos no banco guardam a cor dos botões no próprio HTML: troque o código da cor antiga pela nova em cada modelo (*Configurações → Notificações*).
 - **Manual técnico:** `README.md`, `docs/SPEC.md`, `docs/DEPLOY.md` e `SETUP_PROMPT.md` (prompt para refazer o setup com um agente de IA) ficam no repositório.
